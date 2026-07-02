@@ -21,28 +21,30 @@
 </div>
 
 <script>
-    // BẮT BUỘC: Thay link này bằng link HTTPS từ ngrok (ví dụ: https://abcd-1234.ngrok-free.dev)
     const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev'; 
     
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
 
+    // Đoạn code bạn yêu cầu đã được tích hợp tại đây
     document.getElementById("shareContact").addEventListener("click", () => {
-        // Kiểm tra xem trình duyệt có hỗ trợ requestContact không
-        if (tg.requestContact) {
-            document.getElementById("shareContact").textContent = 'Đang xác nhận...';
-            tg.requestContact();
-        } else {
-            alert("Trình duyệt không hỗ trợ chia sẻ liên hệ.");
+        document.getElementById("shareContact").textContent = 'Đang gọi Telegram...';
+        
+        try {
+            if (window.Telegram.WebApp.requestContact) {
+                window.Telegram.WebApp.requestContact();
+            } else {
+                alert("Lỗi: Nền tảng không hỗ trợ requestContact");
+            }
+        } catch (e) {
+            alert("Lỗi: " + e.toString());
         }
     });
 
-    // Telegram sẽ trả về dữ liệu contact thông qua sự kiện này
+    // Lắng nghe phản hồi sau khi gọi requestContact
     tg.onEvent('contactRequested', (data) => {
         if (data.status === 'sent') {
-            // Lưu ý: Telegram WebApp trả về contact qua data.response hoặc event khác tùy phiên bản
-            // Ở đây ta gọi hàm gửi tới VPS
             sendPhoneToServer(data.response.contact.phone_number);
         } else {
             alert("Bạn cần nhấn Cho phép để xác minh.");
@@ -64,7 +66,7 @@
                 alert("Lỗi server: " + data.message);
             }
         } catch (err) {
-            alert("Lỗi kết nối HTTPS! Hãy đảm bảo Ngrok đang chạy.");
+            alert("Lỗi kết nối VPS: " + err.message);
         }
         document.getElementById("shareContact").textContent = 'Xác Nhận';
     }
