@@ -33,10 +33,17 @@
     });
 
     // 3. Xử lý khi Telegram trả kết quả
+    // 3. Xử lý khi Telegram trả kết quả
     tg.onEvent('contactRequested', (data) => {
         if (data.status === 'sent') {
-            alert("Đã gửi SĐT thành công!");
-            tg.MainButton.hide();
+            // Thay vì chỉ alert, hãy đổi chữ để người dùng biết đã xong
+            tg.MainButton.text = "XÁC MINH THÀNH CÔNG!";
+            tg.MainButton.disable(); // Khóa nút không cho bấm lại
+            
+            alert("Đã gửi SĐT thành công! Bạn có thể đóng cửa sổ này.");
+            
+            // TÙY CHỌN: Tự động đóng Mini App sau khi gửi thành công
+            // tg.close(); 
         } else {
             alert("Bạn cần nhấn Cho phép chia sẻ SĐT.");
             tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
