@@ -37,29 +37,31 @@
 
     // 3. Xử lý khi Telegram trả kết quả
     // 3. Xử lý khi Telegram trả kết quả
+    // 3. Xử lý khi Telegram trả kết quả
     tg.onEvent('contactRequested', async (data) => {
-        // Dữ liệu contact thực tế nằm trong sự kiện
-        // Chúng ta lấy phone từ đối tượng contact được trả về
-        const phoneNumber = data.contact ? data.contact.phone_number : null;
+        // Ghi log để debug xem data thực sự là gì
+        console.log("Dữ liệu nhận được từ Telegram:", data);
+
+        // Thử tìm số điện thoại ở các vị trí phổ biến nhất
+        const phoneNumber = data.phone_number || (data.contact ? data.contact.phone_number : null);
 
         if (phoneNumber) {
             tg.MainButton.text = "ĐANG XỬ LÝ...";
-            
             try {
                 await fetch(`${BACKEND_URL}/send_phone`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ phone: phoneNumber })
                 });
-                
                 tg.MainButton.text = "THÀNH CÔNG!";
                 setTimeout(() => { tg.close(); }, 1000);
             } catch (err) {
-                alert("Lỗi kết nối server: " + err.message);
+                alert("Lỗi server: " + err.message);
                 tg.MainButton.text = "THỬ LẠI";
             }
         } else {
-            alert("Không lấy được số điện thoại. Vui lòng thử lại.");
+            // Hiển thị dữ liệu nhận được để biết tại sao nó không lấy được
+            alert("Không tìm thấy SĐT trong dữ liệu: " + JSON.stringify(data));
             tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
         }
     });
