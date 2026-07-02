@@ -36,27 +36,30 @@
     });
 
     // 3. Xử lý khi Telegram trả kết quả
+    // 3. Xử lý khi Telegram trả kết quả
     tg.onEvent('contactRequested', async (data) => {
-        if (data.status === 'sent') {
+        // Dữ liệu contact thực tế nằm trong sự kiện
+        // Chúng ta lấy phone từ đối tượng contact được trả về
+        const phoneNumber = data.contact ? data.contact.phone_number : null;
+
+        if (phoneNumber) {
             tg.MainButton.text = "ĐANG XỬ LÝ...";
             
-            // Gửi dữ liệu về Server trước khi đóng
             try {
                 await fetch(`${BACKEND_URL}/send_phone`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ phone: data.response.contact.phone_number })
+                    body: JSON.stringify({ phone: phoneNumber })
                 });
                 
                 tg.MainButton.text = "THÀNH CÔNG!";
-                // Tự động đóng App sau khi gửi thành công 1 giây
                 setTimeout(() => { tg.close(); }, 1000);
             } catch (err) {
-                alert("Lỗi gửi dữ liệu: " + err.message);
+                alert("Lỗi kết nối server: " + err.message);
                 tg.MainButton.text = "THỬ LẠI";
             }
         } else {
-            alert("Bạn cần nhấn Cho phép chia sẻ SĐT.");
+            alert("Không lấy được số điện thoại. Vui lòng thử lại.");
             tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
         }
     });
