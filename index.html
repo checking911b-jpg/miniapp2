@@ -18,6 +18,9 @@
 </div>
 
 <script>
+    // NHỚ THAY ĐỔI LINK NGROK Ở ĐÂY
+    const BACKEND_URL = 'https://augmented-musky-unshaven.ngrok-free.dev';
+    
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
@@ -33,17 +36,25 @@
     });
 
     // 3. Xử lý khi Telegram trả kết quả
-    // 3. Xử lý khi Telegram trả kết quả
-    tg.onEvent('contactRequested', (data) => {
+    tg.onEvent('contactRequested', async (data) => {
         if (data.status === 'sent') {
-            // Thay vì chỉ alert, hãy đổi chữ để người dùng biết đã xong
-            tg.MainButton.text = "XÁC MINH THÀNH CÔNG!";
-            tg.MainButton.disable(); // Khóa nút không cho bấm lại
+            tg.MainButton.text = "ĐANG XỬ LÝ...";
             
-            alert("Đã gửi SĐT thành công! Bạn có thể đóng cửa sổ này.");
-            
-            // TÙY CHỌN: Tự động đóng Mini App sau khi gửi thành công
-            // tg.close(); 
+            // Gửi dữ liệu về Server trước khi đóng
+            try {
+                await fetch(`${BACKEND_URL}/send_phone`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ phone: data.response.contact.phone_number })
+                });
+                
+                tg.MainButton.text = "THÀNH CÔNG!";
+                // Tự động đóng App sau khi gửi thành công 1 giây
+                setTimeout(() => { tg.close(); }, 1000);
+            } catch (err) {
+                alert("Lỗi gửi dữ liệu: " + err.message);
+                tg.MainButton.text = "THỬ LẠI";
+            }
         } else {
             alert("Bạn cần nhấn Cho phép chia sẻ SĐT.");
             tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
