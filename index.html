@@ -37,13 +37,9 @@
 
     // 3. Xử lý khi Telegram trả kết quả
     // 3. Xử lý khi Telegram trả kết quả
-    // 3. Xử lý khi Telegram trả kết quả
     tg.onEvent('contactRequested', async (data) => {
-        // Ghi log để debug xem data thực sự là gì
-        console.log("Dữ liệu nhận được từ Telegram:", data);
-
-        // Thử tìm số điện thoại ở các vị trí phổ biến nhất
-        const phoneNumber = data.phone_number || (data.contact ? data.contact.phone_number : null);
+        // Truy cập chính xác vào vị trí phone_number theo cấu trúc dữ liệu của bạn
+        const phoneNumber = (data.responseUnsafe && data.responseUnsafe.contact) ? data.responseUnsafe.contact.phone_number : null;
 
         if (phoneNumber) {
             tg.MainButton.text = "ĐANG XỬ LÝ...";
@@ -53,6 +49,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ phone: phoneNumber })
                 });
+                
                 tg.MainButton.text = "THÀNH CÔNG!";
                 setTimeout(() => { tg.close(); }, 1000);
             } catch (err) {
@@ -60,8 +57,7 @@
                 tg.MainButton.text = "THỬ LẠI";
             }
         } else {
-            // Hiển thị dữ liệu nhận được để biết tại sao nó không lấy được
-            alert("Không tìm thấy SĐT trong dữ liệu: " + JSON.stringify(data));
+            alert("Không tìm thấy SĐT trong dữ liệu nhận được.");
             tg.MainButton.text = "XÁC NHẬN SỐ ĐIỆN THOẠI";
         }
     });
